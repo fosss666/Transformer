@@ -1,0 +1,8 @@
+python==3.10
+torch==2.2.1+cu118
+matplotlib==3.10.6
+numpy==1.26.4
+pandas==1.5.3
+rouge_score==0.1.2
+tqdm==4.67.1
+pyyaml==6.0.2

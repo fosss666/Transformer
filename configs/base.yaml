@@ -1,0 +1,31 @@
+# 数据参数
+data:
+  data_root: "data"
+  block_size: 128
+  overwrite_vocab: false
+
+# 模型超参数
+model:
+  d_model: 256          # 嵌入维度
+  n_layers: 4           # 编码器/解码器层数
+  n_heads: 4            # 注意力头数（消融实验：single_head=true时强制为1）
+  d_hidden: 1024        # FFN隐藏层维度
+  dropout: 0.1
+  pad_id: 0             # PAD标记ID（与词汇表一致）
+
+# 训练参数
+train:
+  epochs: 10
+  batch_size: 256
+  lr: 3e-4              # 初始学习率
+  seed: 42
+  num_workers: 0
+  best_model_path: "results/results1/best_transformer_model.pth"
+  log_path: "results/results1/train_log.csv"
+  curve_path: "results/results1/train_val_curves.png"
+
+# 消融实验配置
+ablation:
+  use_pos_emb: true     # 是否使用位置编码
+  single_head: false    # 是否使用单头注意力（覆盖n_heads=1）
+  use_residual_norm: true  # 是否使用残差连接+层归一化
