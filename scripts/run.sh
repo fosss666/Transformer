@@ -1,10 +1,9 @@
 #!/bin/bash
 set -e
 
-# 简化配置：直接在脚本内指定核心路径（无需yq解析YAML）
-CONFIG_PATH="../configs/config.yaml"
+CONFIG_PATH="../configs/base.yaml"
 TEST_MODE=false
-# 手动指定结果目录（与config.yaml中的best_model_path一致）
+# 手动指定结果目录
 RESULTS_DIR="../results/results1"
 
 # 解析命令行参数
@@ -31,14 +30,18 @@ if [ ! -f "$CONFIG_PATH" ]; then
   exit 1
 fi
 
-# 创建结果目录（如果不存在）
+# 创建结果目录
 mkdir -p "$RESULTS_DIR"
 
-# 执行脚本
+# 先运行 data.py 生成/更新词汇表
+echo "=== 第一步：运行 data.py 准备数据并生成词汇表 ==="
+python data.py --config "$CONFIG_PATH"
+
+# 执行 main.py
 if [ "$TEST_MODE" = true ]; then
-  echo "=== 执行测试模式（使用配置：$CONFIG_PATH）==="
+  echo "=== 第二步：执行测试模式（使用配置：$CONFIG_PATH）==="
   python main.py --config "$CONFIG_PATH" --test
 else
-  echo "=== 执行训练模式（使用配置：$CONFIG_PATH）==="
+  echo "=== 第二步：执行训练模式（使用配置：$CONFIG_PATH）==="
   python main.py --config "$CONFIG_PATH"
 fi

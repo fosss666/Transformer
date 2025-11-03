@@ -1,62 +1,36 @@
-"""
-Gigaword 本地数据集加载脚本（适配本地文件结构）
-
-功能：
-- 加载本地已下载的Gigaword数据集（src=原文，tgt=摘要）
-- 支持指定数据集根目录（含giga_data/org_data）
-- 构建字符级 vocab 并保存
-- 提供与模型兼容的DataLoader和元信息
-- 支持--test验证数据加载
-
-依赖：torch, numpy, tqdm（可选，用于进度条）
-本地文件结构要求（与你的截图一致）：
-<data_root>/
-  ├─ giga_data/
-  └─ org_data/
-     ├─ dev.src.txt    （验证集原文）
-     ├─ dev.tgt.txt    （验证集摘要）
-     ├─ test.src.txt   （测试集原文）
-     ├─ test.tgt.txt   （测试集摘要）
-     ├─ train.src.txt  （训练集原文）
-     ├─ train.tgt.txt  （训练集摘要）
-     ├─ train.src.10k  （训练集原文10k子集，优先使用）
-     └─ train.tgt.10k  （训练集摘要10k子集，优先使用）
-"""
 import argparse
 import json
-import os
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
-from tqdm import tqdm  # 可选，用于显示加载进度
+from tqdm import tqdm
 
-# 本地数据集文件映射（根据你的文件结构定义）
-# 优先使用10k子集（数据量小，适合本地训练）
+# 本地数据集文件映射
 FILE_MAPPING = {
     "train": {
-        "src": "train.src",  # 训练集原文
-        # "src": "train.src.10k",  # 训练集原文（10k子集）
-        "tgt": "train.tgt"   # 训练集摘要
-        # "tgt": "train.tgt.10k"   # 训练集摘要（10k子集）
+        "src": "train.src",
+        # "src": "train.src.10k",
+        "tgt": "train.tgt"
+        # "tgt": "train.tgt.10k"
     },
     "val": {
-        "src": "dev.src",    # 验证集原文（dev=validation）
-        "tgt": "dev.tgt"     # 验证集摘要
+        "src": "dev.src",
+        "tgt": "dev.tgt"
     },
     "test": {
-        "src": "test.src",   # 测试集原文
-        "tgt": "test.tgt"    # 测试集摘要
+        "src": "test.src",
+        "tgt": "test.tgt"
     }
 }
-# 数据集根目录下的子文件夹（根据你的截图，文件在org_data或giga_data中）
-DATA_SUB_DIRS = ["ggw_data"]  # 自动搜索这两个子目录
+# 数据集根目录下的子文件夹
+DATA_SUB_DIRS = ["ggw_data"]
 
 
 def set_seed(seed: int):
-    """固定随机种子，确保可复现性"""
+    """固定随机种子"""
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -65,10 +39,10 @@ def set_seed(seed: int):
 
 
 def find_data_dir(root_dir: Path) -> Path:
-    """自动搜索数据集实际目录（在root_dir下的DATA_SUB_DIRS中）"""
+    """自动搜索数据集实际目录"""
     for sub_dir in DATA_SUB_DIRS:
         candidate = root_dir / sub_dir
-        if candidate.exists() and any(candidate.glob("*.src*")):  # 检查是否有src文件
+        if candidate.exists() and any(candidate.glob("*.src*")):
             return candidate
     raise FileNotFoundError(
         f"未在 {root_dir} 下的 {DATA_SUB_DIRS} 中找到数据集文件，请检查路径是否正确"
@@ -80,18 +54,17 @@ def load_local_samples(data_root: Path) -> Dict[str, List[Dict]]:
     print(f"[data.py] 从本地目录加载数据：{data_dir}")
 
     data_splits = {}
-    # 定义各数据集的最大样本数（训练集用10k子集，验证集/测试集各取1k）
+    # 定义各数据集的最大样本数
     MAX_SAMPLES = {
-    "train": 200000,  # 20K pairs（训练集）
-    "val": 20000,     # 验证集取10%（2千对，比例合理）
-    "test": 20000     # 测试集取10%（2千对）
+    "train": 200000,  # 20K pairs
+    "val": 20000,     # 验证集取10%
+    "test": 20000     # 测试集取10%
 }
 
     for split, files in FILE_MAPPING.items():
         src_path = data_dir / files["src"]
         tgt_path = data_dir / files["tgt"]
 
-        # 读取文件（保持不变）
         with open(src_path, "r", encoding="utf-8") as f_src, \
              open(tgt_path, "r", encoding="utf-8") as f_tgt:
             src_lines = [line.strip() for line in f_src if line.strip()]
@@ -99,7 +72,7 @@ def load_local_samples(data_root: Path) -> Dict[str, List[Dict]]:
             if len(src_lines) != len(tgt_lines):
                 raise ValueError(f"{split} 原文和摘要行数不匹配")
 
-        # 截断样本数（只对val和test生效）
+        # 截断样本数
         max_n = MAX_SAMPLES[split]
         if max_n is not None and len(src_lines) > max_n:
             src_lines = src_lines[:max_n]
@@ -122,9 +95,9 @@ def build_vocab(samples: List[Dict]) -> Tuple[Dict[str, int], Dict[int, str]]:
         all_chars.update(sample["article"])
         all_chars.update(sample["summary"])
 
-    # 排序字符（确保词汇表顺序固定）
+    # 排序字符
     chars = sorted(list(all_chars))
-    # 特殊标记（顺序不可修改，与模型逻辑关联）
+    # 特殊标记
     special_tokens = ["<PAD>", "<SOS>", "<EOS>"]
     chars = special_tokens + chars
 
@@ -151,22 +124,22 @@ def load_vocab(vocab_dir: Path) -> Tuple[Dict[str, int], Dict[int, str]]:
         stoi = json.load(f)
     with open(vocab_dir / "itos.json", "r", encoding="utf-8") as f:
         itos_raw = json.load(f)
-    itos = {int(idx_str): char for idx_str, char in itos_raw.items()}  # 转换键为int
+    itos = {int(idx_str): char for idx_str, char in itos_raw.items()}
     return stoi, itos
 
 
 class Seq2SeqDataset(Dataset):
     """
     适配Gigaword的seq2seq数据集：
-    - x: 编码后的原文（article），长度=block_size，无SOS/EOS，不足用<PAD>填充
-    - y: 编码后的摘要（summary），长度=block_size，带SOS（开头）和EOS（结尾），不足用<PAD>填充
+    - x: 编码后的原文，长度=block_size，无SOS/EOS，不足用<PAD>填充
+    - y: 编码后的摘要，长度=block_size，带SOS（开头）和EOS（结尾），不足用<PAD>填充
     """
     def __init__(self, samples: List[Dict], stoi: Dict[str, int], block_size: int):
         self.samples = samples
         self.stoi = stoi
         self.block_size = block_size
 
-        # 特殊标记ID（从词汇表获取，避免硬编码）
+        # 特殊标记ID
         self.pad_id = stoi["<PAD>"]
         self.sos_id = stoi["<SOS>"]
         self.eos_id = stoi["<EOS>"]
@@ -176,10 +149,10 @@ class Seq2SeqDataset(Dataset):
 
     def _process_sequence(self, text: str, is_target: bool = False) -> torch.Tensor:
         """处理文本为ID序列：截断/填充，目标序列添加SOS/EOS"""
-        # 过滤词汇表外的字符（避免KeyError）
+        # 过滤词汇表外的字符
         id_list = [self.stoi[char] for char in text if char in self.stoi]
 
-        # 目标序列（摘要）添加SOS和EOS
+        # 目标序列添加SOS和EOS
         if is_target:
             id_list = [self.sos_id] + id_list + [self.eos_id]
 
@@ -193,10 +166,9 @@ class Seq2SeqDataset(Dataset):
         return torch.tensor(id_list, dtype=torch.long)
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        """返回单个样本：(原文编码x, 摘要编码y)"""
         sample = self.samples[idx]
-        x = self._process_sequence(sample["article"], is_target=False)  # 原文→x
-        y = self._process_sequence(sample["summary"], is_target=True)   # 摘要→y
+        x = self._process_sequence(sample["article"], is_target=False)
+        y = self._process_sequence(sample["summary"], is_target=True)
         return x, y
 
 
@@ -206,16 +178,15 @@ def prepare_data(data_root: Path, overwrite_vocab: bool = False) -> Tuple[Dict, 
     data_splits = load_local_samples(data_root)
 
     # 2. 构建或加载词汇表
-    vocab_dir = data_root / "vocab"  # 词汇表保存目录（在数据根目录下）
+    vocab_dir = data_root / "vocab"
     if vocab_dir.exists() and not overwrite_vocab:
         print(f"[data.py] 加载已存在的词汇表：{vocab_dir}")
         stoi, itos = load_vocab(vocab_dir)
     else:
         print(f"[data.py] 基于所有样本构建词汇表...")
-        # 合并所有split的样本用于构建词汇表（覆盖所有字符）
+        # 合并所有split的样本用于构建词汇表
         all_samples = data_splits["train"] + data_splits["val"] + data_splits["test"]
         stoi, itos = build_vocab(all_samples)
-        # 保存词汇表
         save_vocab(stoi, itos, vocab_dir)
 
     return data_splits, stoi, itos
@@ -231,15 +202,12 @@ def get_dataloaders(
 ) -> Tuple[DataLoader, DataLoader, DataLoader, Dict]:
     """
     返回训练/验证/测试DataLoader和元信息，与模型代码兼容
-    data_root: 数据集根目录（包含giga_data/org_data的上级目录）
     """
     set_seed(seed)
     data_root = Path(data_root)
 
-    # 准备数据和词汇表
     data_splits, stoi, itos = prepare_data(data_root, overwrite_vocab=overwrite_vocab)
 
-    # 创建数据集
     train_dataset = Seq2SeqDataset(
         samples=data_splits["train"],
         stoi=stoi,
@@ -256,13 +224,12 @@ def get_dataloaders(
         block_size=block_size
     )
 
-    # 创建DataLoader
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
-        pin_memory=True  # 加速GPU传输（可选）
+        pin_memory=True
     )
     val_loader = DataLoader(
         val_dataset,
@@ -279,7 +246,6 @@ def get_dataloaders(
         pin_memory=True
     )
 
-    # 元信息（供模型训练代码使用）
     meta = {
         "vocab_size": len(stoi),
         "stoi": stoi,
@@ -297,22 +263,21 @@ def get_dataloaders(
 
 
 def main():
-    """CLI入口：验证本地数据加载"""
     parser = argparse.ArgumentParser(description="Gigaword本地数据集加载脚本")
     parser.add_argument("--data_root", type=str, default="data", 
-                       help="数据集根目录（包含giga_data/org_data的上级目录）")
+                       help="数据集根目录")
     parser.add_argument("--overwrite_vocab", action="store_true", 
-                       help="强制重新构建词汇表（不影响原始数据）")
+                       help="强制重新构建词汇表")
     parser.add_argument("--block_size", type=int, default=128, 
-                       help="序列最大长度（适配模型输入）")
+                       help="序列最大长度")
     parser.add_argument("--batch_size", type=int, default=32, 
                        help="测试用batch size")
     parser.add_argument("--seed", type=int, default=42, 
                        help="随机种子")
     parser.add_argument("--num_workers", type=int, default=0, 
-                       help="DataLoader多进程数（Windows建议0）")
+                       help="DataLoader多进程数")
     parser.add_argument("--test", action="store_true", 
-                       help="测试数据加载：打印batch信息和样本示例")
+                       help="测试数据加载，打印batch信息和样本示例")
     args = parser.parse_args()
 
     set_seed(args.seed)
@@ -328,7 +293,6 @@ def main():
             overwrite_vocab=args.overwrite_vocab
         )
 
-        # 打印基本信息
         print("\n=== 数据加载测试结果 ===")
         print(f"词汇表大小：{meta['vocab_size']}")
         print(f"特殊标记ID：PAD={meta['pad_id']}, SOS={meta['sos_id']}, EOS={meta['eos_id']}")
@@ -339,13 +303,13 @@ def main():
         x, y = batch
         print(f"\nBatch 张量形状：x={x.shape}, y={y.shape}（预期：(batch_size, block_size)）")
 
-        # 解码并打印第一个样本（原文+摘要）
+        # 解码并打印第一个样本
         itos = meta["itos"]
         pad_id = meta["pad_id"]
-        # 解码原文（x[0]）
+        # 解码原文
         input_ids = x[0].tolist()
         input_text = "".join([itos[idx] for idx in input_ids if idx != pad_id])
-        # 解码摘要（y[0]）
+        # 解码摘要
         target_ids = y[0].tolist()
         target_text = "".join([itos[idx] for idx in target_ids if idx != pad_id])
 
@@ -354,7 +318,7 @@ def main():
         print(f"摘要（前100字符）：{target_text[:100]}...")
 
     else:
-        # 仅准备数据（加载样本+构建词汇表）
+        # 仅准备数据
         prepare_data(Path(args.data_root), overwrite_vocab=args.overwrite_vocab)
         print("[data.py] 数据准备完成！可使用 --test 参数验证加载结果")
 

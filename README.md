@@ -15,7 +15,7 @@ NVIDIA GTX 4090
 + 创建并激活虚拟环境
 
   ```python
-  conda create -n transformer python=3.9.7 -y
+  conda create -n transformer python=3.10 -y
   conda activate transformer
   ```
 
@@ -31,13 +31,16 @@ NVIDIA GTX 4090
   # 先将data中的数据集解压！
   
   # 使用自定义配置训练
-  sh run.sh --config configs/config.yaml
+  sh run.sh --config configs/base.yaml
   
   # 使用自定义配置测试
-  sh run.sh --config configs/config.yaml --test
+  sh run.sh --config configs/base.yaml --test
   
   # 命令行参数覆盖配置
-  sh run.sh --config configs/config.yaml --lr 5e-4
+  sh run.sh --config configs/base.yaml --lr 5e-4
+  
+  # 消融
+  sh run.sh --config configs/ablation.yaml
   ````
   
   
