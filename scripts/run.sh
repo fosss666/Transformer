@@ -39,9 +39,9 @@ python data.py --config "$CONFIG_PATH"
 
 # 执行 main.py
 if [ "$TEST_MODE" = true ]; then
-  echo "=== 第二步：执行测试模式（使用配置：$CONFIG_PATH）==="
+  echo "=== 第二步：执行测试模式==="
   python main.py --config "$CONFIG_PATH" --test
 else
-  echo "=== 第二步：执行训练模式（使用配置：$CONFIG_PATH）==="
+  echo "=== 第二步：执行训练模式==="
   python main.py --config "$CONFIG_PATH"
 fi

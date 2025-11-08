@@ -12,9 +12,7 @@ from tqdm import tqdm
 FILE_MAPPING = {
     "train": {
         "src": "train.src",
-        # "src": "train.src.10k",
         "tgt": "train.tgt"
-        # "tgt": "train.tgt.10k"
     },
     "val": {
         "src": "dev.src",
@@ -56,9 +54,9 @@ def load_local_samples(data_root: Path) -> Dict[str, List[Dict]]:
     data_splits = {}
     # 定义各数据集的最大样本数
     MAX_SAMPLES = {
-    "train": 200000,  # 20K pairs
-    "val": 20000,     # 验证集取10%
-    "test": 20000     # 测试集取10%
+    "train": 200000,
+    "val": 20000,
+    "test": 20000
 }
 
     for split, files in FILE_MAPPING.items():
@@ -139,7 +137,6 @@ class Seq2SeqDataset(Dataset):
         self.stoi = stoi
         self.block_size = block_size
 
-        # 特殊标记ID
         self.pad_id = stoi["<PAD>"]
         self.sos_id = stoi["<SOS>"]
         self.eos_id = stoi["<EOS>"]

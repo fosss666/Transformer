@@ -336,8 +336,8 @@ def main():
                 "total_train_time(s)": total_train_time,
                 "args": args
             }, args.best_model_path)
-            print(f"[main.py] 训练结束，最优模型保存至：{args.best_model_path}（1-19模型保存要求）")
-            print(f"[main.py] 总训练时间：{total_train_time}s（{total_train_time/60:.2f}min）（1-78可复现性要求）")
+            print(f"[main.py] 训练结束，最优模型保存至：{args.best_model_path}")
+            print(f"[main.py] 总训练时间：{total_train_time}s（{total_train_time/60:.2f}min）")
 
         plot_curves(args.log_path, args.curve_path)
 
